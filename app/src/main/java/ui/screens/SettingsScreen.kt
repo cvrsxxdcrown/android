@@ -1,23 +1,30 @@
 package com.example.cardgame500.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
-
 import com.example.cardgame500.data.network.RetrofitInstance
+
+private const val PREFS_NAME = "http_settings"
+private const val KEY_NAME = "user_name"
 
 @Composable
 fun SettingsScreen() {
 
-    // 🔹 имя, вводимое пользователем
-    var name by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    // 🔹 текст результата
+    var name by remember {
+        mutableStateOf(prefs.getString(KEY_NAME, "") ?: "")
+    }
+
     var resultText by remember {
-        mutableStateOf("Введите имя и нажмите кнопку")
+        mutableStateOf("Введите имя и выполните HTTP-запрос")
     }
 
     var loading by remember { mutableStateOf(false) }
@@ -36,11 +43,13 @@ fun SettingsScreen() {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ПОЛЕ ВВОДА ИМЕНИ
         OutlinedTextField(
             value = name,
-            onValueChange = { name = it },
-            label = { Text("Введите имя") },
+            onValueChange = {
+                name = it
+                prefs.edit().putString(KEY_NAME, it).apply()
+            },
+            label = { Text("Имя") },
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -52,29 +61,22 @@ fun SettingsScreen() {
 
         Button(
             onClick = {
-                if (name.isBlank()) {
-                    resultText = "Имя не может быть пустым"
-                    return@Button
-                }
-
                 scope.launch {
                     loading = true
                     try {
-
-                        val response = RetrofitInstance.api.getAge(name)
-
+                        val response = RetrofitInstance.api.getAge(name.ifBlank { "ivan" })
                         resultText =
                             "Имя: ${response.name}\n" +
                                     "Предполагаемый возраст: ${response.age}\n" +
                                     "Количество записей: ${response.count}"
-
                     } catch (e: Exception) {
-                        resultText = "Ошибка сети. Проверьте подключение к интернету."
+                        resultText = "Ошибка сети"
                     }
                     loading = false
                 }
             },
-            enabled = !loading
+            enabled = !loading && name.isNotBlank(),
+            modifier = Modifier.fillMaxWidth()
         ) {
             Text(if (loading) "Загрузка..." else "Отправить запрос")
         }
